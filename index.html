@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fin - Asisten Warung Mbah Marto</title>
+    
+    <!-- Konfigurasi PWA & Ikon Layar Utama (Add to Home Screen) -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Q-Nota">
+    <meta name="application-name" content="Q-Nota">
+    
+    <!-- Ikon Aplikasi (Logo Q Besar Warna Biru Indigo) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%234f46e5'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-weight='900' font-size='350' fill='%23ffffff' text-anchor='middle' dy='.35em'%3EQ%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%234f46e5'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-weight='900' font-size='350' fill='%23ffffff' text-anchor='middle' dy='.35em'%3EQ%3C/text%3E%3C/svg%3E">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f8fafc; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        input[type="date"]::-webkit-inner-spin-button { display: none; -webkit-appearance: none; }
+        input[type="date"] { position: relative; }
+        
+        /* Assistant Chat Animations */
+        .chat-enter { animation: slideUpFade 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        
+        .modal-enter { animation: modalIn 0.2s ease-out forwards; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-status { animation: fadeIn 0.3s ease-out forwards; }
+        
+        .glass-nav { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+        .glass-bubble { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const Icons = {
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
+            ShopBag: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
+            Wallet: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9.42a2 2 0 0 0-1.5-1.92L4.5 6"/><path d="M15 13h2"/><path d="M15 17h2"/></svg>,
+            Bot: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/><path d="M12 2v2"/><path d="M12 8v0"/></svg>,
+            Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>,
+            Archive: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>,
+            Send: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>,
+            Warn: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
+            Gear: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>,
+            ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
+            ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        };
+
+        const initialItems = ["Ayam Gede (Mentah)", "Lele Segar", "Telur Ayam", "Beras", "Minyak Goreng", "Gula Pasir", "Gas LPG 3Kg", "Sabun Cuci", "Lunch Box Size M", "Cup Minum", "Kangkung", "Tahu Putih (Mentah)"];
+        const incomeTypes = ["Shopeefood", "Grabfood", "Gofood", "Offline Cash", "Offline QRIS"];
+        const commonUnits = ['Kg', 'Pcs', 'Gram', 'Liter', 'Ikat', 'Bungkus', 'Pack'];
+
+        // Initial Settings
+        const defaultSettings = { targetOmzet: 500000, maxBelanja: 300000, saldoAwal: 1000000 };
+
+        // Helper timezone local format (YYYY-MM-DD)
+        const getLocalDateStr = (d = new Date()) => {
+            const date = new Date(d);
+            return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        };
+
+        // --- ENVIRONMENT DETECTION ---
+        let isLocalMode = false;
+        let auth, db;
+        let appId = 'q-nota-local';
+
+        try {
+            const firebaseConfig = JSON.parse(__firebase_config);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'q-nota-app';
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+        } catch (e) {
+            isLocalMode = true;
+        }
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('assistant');
+            const [status, setStatus] = useState({ show: false, message: '', type: 'success' });
+            const [showNav, setShowNav] = useState(true);
+            
+            // --- DATA STATES ---
+            const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('fin-cart') || '[]'));
+            const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('fin-history') || '[]'));
+            const [incomes, setIncomes] = useState(() => JSON.parse(localStorage.getItem('fin-incomes') || '[]'));
+            const [agendas, setAgendas] = useState(() => JSON.parse(localStorage.getItem('fin-agendas') || '[]'));
+            const [itemsDB, setItemsDB] = useState(() => JSON.parse(localStorage.getItem('fin-master') || JSON.stringify(initialItems)));
+            const [settings, setSettings] = useState(() => JSON.parse(localStorage.getItem('fin-settings') || JSON.stringify(defaultSettings)));
+            
+            const [user, setUser] = useState(null);
+
+            // --- CHAT & AI STATE ---
+            const [chats, setChats] = useState([]);
+            const [chatInput, setChatInput] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const chatEndRef = useRef(null);
+
+            // --- PLAN STATES ---
+            const [editingId, setEditingId] = useState(null);
+            const [itemName, setItemName] = useState('');
+            const [qty, setQty] = useState('');
+            const [unit, setUnit] = useState('Kg');
+            const [totalNominal, setTotalNominal] = useState('');
+            const [transactionDate, setTransactionDate] = useState(getLocalDateStr());
+            const [showSuggestions, setShowSuggestions] = useState(false);
+            const [currentNoteId, setCurrentNoteId] = useState(null);
+
+            // --- INCOME STATES ---
+            const [incomeDate, setIncomeDate] = useState(getLocalDateStr());
+            const [incomeSource, setIncomeSource] = useState('');
+            const [incomeAmount, setIncomeAmount] = useState('');
+            const [showIncomeSuggestions, setShowIncomeSuggestions] = useState(false);
+
+            // --- AGENDA STATES ---
+            const [agendaDate, setAgendaDate] = useState(getLocalDateStr());
+            const [agendaTitle, setAgendaTitle] = useState('');
+            const [agendaAmount, setAgendaAmount] = useState('');
+            const [agendaType, setAgendaType] = useState('keluar');
+            const [reminderModal, setReminderModal] = useState({ show: false, items: [] });
+            const hasCheckedAgenda = useRef(false);
+
+            const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
+            const [showSettings, setShowSettings] = useState(false);
+            const [isSaving, setIsSaving] = useState(false);
+
+            const formatNumber = (num) => new Intl.NumberFormat('id-ID').format(num);
+            const showStatus = (message, type = 'success') => {
+                setStatus({ show: true, message, type });
+                setTimeout(() => setStatus(prev => ({ ...prev, show: false })), 2000);
+            };
+
+            const paths = useMemo(() => {
+                if (isLocalMode || !user) return null;
+                return { history: `artifacts/${appId}/users/${user.uid}/history`, master: `artifacts/${appId}/users/${user.uid}/master/data`, cart: `artifacts/${appId}/users/${user.uid}/current/cart` };
+            }, [user]);
+
+            // Calculate Current Actual Balance
+            const currentBalance = useMemo(() => {
+                const totalIn = incomes.reduce((sum, inc) => sum + inc.amount, 0);
+                const totalOut = history.reduce((sum, exp) => sum + exp.total, 0);
+                return settings.saldoAwal + totalIn - totalOut;
+            }, [incomes, history, settings]);
+
+            // Sync to LocalStorage
+            useEffect(() => { localStorage.setItem('fin-cart', JSON.stringify(cart)); }, [cart]);
+            useEffect(() => { localStorage.setItem('fin-history', JSON.stringify(history)); }, [history]);
+            useEffect(() => { localStorage.setItem('fin-incomes', JSON.stringify(incomes)); }, [incomes]);
+            useEffect(() => { localStorage.setItem('fin-agendas', JSON.stringify(agendas)); }, [agendas]);
+            useEffect(() => { localStorage.setItem('fin-master', JSON.stringify(itemsDB)); }, [itemsDB]);
+            useEffect(() => { localStorage.setItem('fin-settings', JSON.stringify(settings)); }, [settings]);
+
+            useEffect(() => { if (activeTab === 'assistant') chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chats, isTyping, activeTab]);
+
+            // Load Cloud Data
+            useEffect(() => {
+                const login = async () => {
+                    if (isLocalMode) { setUser({ uid: 'local_user', displayName: 'Guest' }); return; }
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token);
+                        else await auth.signInAnonymously();
+                    } catch (e) { console.error(e); }
+                };
+                login();
+                if (!isLocalMode) return auth.onAuthStateChanged(setUser);
+            }, []);
+
+            useEffect(() => {
+                if (isLocalMode || !user || !paths) return;
+                const unsubHistory = db.collection(paths.history).onSnapshot(snap => {
+                    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setHistory(data.sort((a, b) => b.timestamp - a.timestamp));
+                });
+                return () => unsubHistory();
+            }, [user, paths]);
+
+            // --- PROACTIVE REMINDER LOGIC (ALARM TAGIHAN) ---
+            useEffect(() => {
+                if (hasCheckedAgenda.current) return;
+                
+                const checkAgendas = () => {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const threeDays = new Date(today);
+                    threeDays.setDate(today.getDate() + 3);
+
+                    const pending = agendas.filter(a => {
+                        if (a.isPaid) return false;
+                        const aDate = new Date(a.date);
+                        aDate.setHours(0,0,0,0);
+                        return aDate <= threeDays;
+                    });
+
+                    if (pending.length > 0) {
+                        setReminderModal({ show: true, items: pending });
+                        hasCheckedAgenda.current = true;
+                    } else if (agendas.length > 0) {
+                        hasCheckedAgenda.current = true; // Data exists but no pending, mark as checked
+                    }
+                };
+                
+                const timer = setTimeout(checkAgendas, 1500); // Wait 1.5s after load
+                return () => clearTimeout(timer);
+            }, [agendas]);
+
+            // --- AI & CHAT LOGIC ---
+            useEffect(() => {
+                if (chats.length === 0) {
+                    let greeting = `Halo Bos! Kas kita saat ini **Rp ${formatNumber(currentBalance)}**.\n\nSemua aman terkendali. Bos bisa cek cash flow di menu bawah, atau ngobrol langsung sama Fin buat tanya soal keadaan bisnis saat ini. Fin siap mikir! 🧠`;
+                    setChats([{ id: Date.now(), sender: 'fin', text: greeting, type: 'text' }]);
+                }
+            }, []);
+
+            // GEMINI PRO (AI) Integration
+            const fetchFinAI = async (userText) => {
+                const apiKey = "";
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                
+                const safeIncomes = incomes || [];
+                const safeHistory = history || [];
+                const safeAgendas = agendas || [];
+
+                const todayStr = getLocalDateStr();
+                const recentIncomes = safeIncomes.slice(0, 5).map(i => `${i.date}: ${i.source} (+Rp${i.amount})`);
+                const recentExpenses = safeHistory.slice(0, 5).map(h => `${h.date}: Belanja (-Rp${h.total})`);
+                const pendingBills = safeAgendas.filter(a => !a.isPaid).map(a => `[${a.date}] ${a.title} (Rp${a.amount})`);
+
+                const sysPrompt = `Anda adalah "Fin", asisten keuangan AI super cerdas untuk "Warung Mbah Marto".
+Gaya bicara: Santai, ceria, proaktif, dan selalu panggil pengguna dengan sebutan "Bos".
+Anda sedang menganalisis data bisnis warung Mbah Marto saat ini:
+- Saldo Kas Riil saat ini: Rp ${currentBalance}
+- Target Omzet Harian: Rp ${settings.targetOmzet}
+- Batas Belanja Harian: Rp ${settings.maxBelanja}
+- Tagihan Belum Dibayar: ${pendingBills.length > 0 ? pendingBills.join(', ') : 'Tidak ada'}
+- Pemasukan Terakhir: ${recentIncomes.length > 0 ? recentIncomes.join(', ') : 'Belum ada'}
+- Pengeluaran Terakhir: ${recentExpenses.length > 0 ? recentExpenses.join(', ') : 'Belum ada'}
+
+Tugas Anda:
+Jawab pertanyaan Bos berdasarkan data live di atas. Jika ditanya keadaan bisnis, analisis secara kritis apakah saldo kas sehat, peringatkan jika ada tagihan yang mendekati jatuh tempo dan uang tidak cukup, dan berikan insight singkat (misal: kurangi belanja / genjot promo).
+Format: Maksimal 2-3 paragraf pendek. Gunakan *italic* atau **bold** sewajarnya untuk highlight nominal. Dilarang keras menggunakan format markdown kompleks atau membuat list bullet yang terlalu panjang.`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: userText }] }],
+                    systemInstruction: { parts: [{ text: sysPrompt }] }
+                };
+
+                let delay = 1000;
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }});
+                        if (!res.ok) throw new Error('API Error');
+                        const data = await res.json();
+                        return data.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf Bos, Fin lagi blank nih.";
+                    } catch (err) {
+                        if (i === 4) return "Waduh Bos, Fin gagal mikir nih (koneksi AI terputus). Coba lagi nanti ya.";
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 2;
+                    }
+                }
+            };
+
+            const generateCashFlowData = (mode) => {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = today.getMonth();
+                
+                let startDate, endDate;
+
+                if (mode === 'minggu') {
+                    const day = today.getDay(); 
+                    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+                    startDate = new Date(year, month, diff);
+                    endDate = new Date(startDate);
+                    endDate.setDate(startDate.getDate() + 6);
+                } else if (mode === 'awal_bulan') {
+                    startDate = new Date(year, month, 1);
+                    endDate = new Date();
+                } else if (mode === 'harian') {
+                    startDate = new Date(year, month, today.getDate());
+                    endDate = new Date(year, month, today.getDate() + 6);
+                } else { // bulan_penuh
+                    startDate = new Date(year, month, 1);
+                    endDate = new Date(year, month + 1, 0);
+                }
+
+                const startStr = getLocalDateStr(startDate);
+                const beforeStartIncomes = incomes.filter(i => i.date < startStr).reduce((s, i) => s + i.amount, 0);
+                const beforeStartExpenses = history.filter(h => h.date < startStr).reduce((s, h) => s + h.total, 0);
+                
+                let runningBalance = settings.saldoAwal + beforeStartIncomes - beforeStartExpenses;
+
+                let reportDays = [];
+                let totalActualInc = 0;
+                let totalActualExp = 0;
+                let actualDaysCount = 0;
+
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    let dStr = getLocalDateStr(d);
+                    let isFuture = dStr > getLocalDateStr(today);
+                    let isToday = dStr === getLocalDateStr(today);
+
+                    let actualInc = incomes.filter(i => i.date === dStr).reduce((s, i) => s + i.amount, 0);
+                    let actualExp = history.filter(h => h.date === dStr).reduce((s, h) => s + h.total, 0);
+                    let hasInc = incomes.some(i => i.date === dStr);
+                    let hasExp = history.some(h => h.date === dStr);
+
+                    if (!isFuture && (hasInc || hasExp || isToday)) {
+                        totalActualInc += actualInc;
+                        totalActualExp += actualExp;
+                        actualDaysCount++;
+                    }
+
+                    let dailyIn = (isFuture && !hasInc) ? settings.targetOmzet : actualInc;
+                    let dailyOut = (isFuture && !hasExp) ? settings.maxBelanja : actualExp;
+
+                    let dayAgendas = agendas.filter(a => a.date === dStr && (!a.isPaid || isFuture));
+                    dayAgendas.forEach(ag => {
+                        if (ag.type === 'keluar') dailyOut += ag.amount;
+                        else dailyIn += ag.amount;
+                    });
+
+                    let saldoPagi = runningBalance;
+                    let saldoSetelahBelanja = saldoPagi - dailyOut; 
+                    runningBalance = saldoPagi - dailyOut + dailyIn;
+
+                    reportDays.push({
+                        date: dStr,
+                        displayDate: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+                        isToday,
+                        isFuture,
+                        saldoPagi,
+                        dailyOut,
+                        saldoSetelahBelanja,
+                        dailyIn,
+                        saldoAkhir: runningBalance,
+                        isCritical: saldoSetelahBelanja < 100000
+                    });
+                }
+
+                const avgInc = actualDaysCount > 0 ? (totalActualInc / actualDaysCount) : settings.targetOmzet;
+                const avgExp = actualDaysCount > 0 ? (totalActualExp / actualDaysCount) : settings.maxBelanja;
+                const projectedFinal = reportDays.length > 0 ? reportDays[reportDays.length - 1].saldoAkhir : currentBalance;
+
+                return { days: reportDays, avgInc, avgExp, projectedFinal, mode };
+            };
+
+            const generateKasReport = () => {
+                const todayStr = getLocalDateStr();
+                const todayIncome = incomes.filter(i => i.date === todayStr).reduce((s, i) => s + i.amount, 0);
+                const todayExpense = history.filter(h => h.date === todayStr).reduce((s, h) => s + h.total, 0);
+                
+                const balanceYesterday = currentBalance - todayIncome + todayExpense;
+                
+                let rep = `**RINCIAN KAS HARI INI**\n\n`;
+                rep += `Saldo Pagi / Kemarin: Rp ${formatNumber(balanceYesterday)}\n`;
+                rep += `➕ Pemasukan Hari Ini: Rp ${formatNumber(todayIncome)}\n`;
+                rep += `➖ Pengeluaran Hari Ini: Rp ${formatNumber(todayExpense)}\n`;
+                rep += `======================\n`;
+                rep += `🟢 **SISA KAS SEKARANG: Rp ${formatNumber(currentBalance)}**\n\n`;
+                rep += `*(Pemasukan yang diinput hari ini otomatis terhitung sebagai saldo yang bisa dibelanjakan hari ini)*`;
+                return rep;
+            };
+
+            const handleChatSubmit = async (e, forcedText = null) => {
+                if (e) e.preventDefault();
+                const text = forcedText || chatInput;
+                if (!text.trim()) return;
+
+                setChats(prev => [...prev, { id: Date.now(), sender: 'user', text, type: 'text' }]);
+                setChatInput('');
+
+                // Quick Widgets Deterministic Action
+                if (forcedText) {
+                    setTimeout(() => {
+                        const lower = text.toLowerCase();
+                        let type = 'report';
+                        let mode = null;
+                        let finResponse = "Berikut laporan interaktif yang Bos minta:";
+                        
+                        if (lower.includes('laporan') || lower.includes('hari')) {
+                            mode = 'harian'; 
+                            if (lower.includes('minggu')) mode = 'minggu';
+                            else if (lower.includes('awal')) mode = 'awal_bulan';
+                            else if (lower.includes('bulan')) mode = 'bulan_penuh';
+                            
+                            type = 'cashflow';
+                        } else if (lower.includes('kas')) {
+                            type = 'kas_report';
+                            finResponse = "Siap Bos! Ini rincian kas kita sekarang:";
+                        }
+                        
+                        setChats(prev => [...prev, { id: Date.now()+1, sender: 'fin', text: finResponse, type, mode }]);
+                    }, 300);
+                    return;
+                }
+
+                // AI Action
+                setIsTyping(true);
+                const aiResponse = await fetchFinAI(text);
+                setIsTyping(false);
+                setChats(prev => [...prev, { id: Date.now()+1, sender: 'fin', text: aiResponse, type: 'text' }]);
+            };
+
+            const renderCashFlowWidget = (data) => {
+                const titleMap = { 'harian': 'Proyeksi 7 Hari (Harian)', 'minggu': 'Minggu Ini', 'awal_bulan': 'Awal Bulan s/d Hari Ini', 'bulan_penuh': 'Satu Bulan Penuh' };
+                return (
+                    <div className="bg-white rounded-[1.5rem] shadow-lg border border-slate-200 overflow-hidden w-full max-w-[320px] text-xs mt-2 font-sans">
+                        <div className="bg-gradient-to-r from-indigo-600 to-blue-500 p-4 text-white text-center shadow-inner relative overflow-hidden">
+                            <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                            <h3 className="font-black uppercase tracking-widest text-[11px] drop-shadow-md relative z-10">Laporan Cash Flow</h3>
+                            <p className="text-[10px] opacity-100 mt-1.5 font-bold bg-white/20 inline-block px-3 py-1 rounded-full relative z-10">{titleMap[data.mode]}</p>
+                        </div>
+                        <div className="max-h-[55vh] overflow-y-auto no-scrollbar p-3 space-y-3 bg-slate-50">
+                            {data.days.map((day, i) => (
+                                <div key={i} className={`p-4 rounded-[1.2rem] border-2 transition-all ${day.isToday ? 'bg-indigo-50 border-indigo-300 shadow-md' : 'bg-white border-slate-100 shadow-sm'} relative overflow-hidden`}>
+                                    {day.isToday && <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>}
+                                    <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-[10px] ${day.isToday ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                {day.date.split('-')[2]}
+                                            </div>
+                                            <span className={`font-black uppercase tracking-widest text-[11px] ${day.isToday ? 'text-indigo-700' : 'text-slate-600'}`}>
+                                                {day.displayDate.split(' ')[1]} {day.isToday && <span className="text-indigo-500 ml-1">(Hari Ini)</span>}
+                                            </span>
+                                        </div>
+                                        {day.isCritical && <span className="bg-red-50 text-red-600 border border-red-200 text-[8px] px-2 py-1 rounded-full font-black uppercase tracking-widest animate-pulse">Kritis</span>}
+                                    </div>
+                                    <div className="space-y-2.5 text-[11px]">
+                                        <div className="flex justify-between items-center"><span className="text-slate-500 font-bold text-[10px]">Saldo Pagi/Kemarin</span><span className="font-black text-slate-800">Rp {formatNumber(day.saldoPagi)}</span></div>
+                                        <div className="flex justify-between items-center"><span className="text-red-400 font-bold text-[10px]">➖ Pengeluaran {day.isFuture ? '(Est)' : ''}</span><span className="font-bold text-red-500">-Rp {formatNumber(day.dailyOut)}</span></div>
+                                        <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg border border-amber-100/50"><span className="text-amber-600 font-black text-[10px] uppercase">Sisa di Laci (Pagi)</span><span className={`font-black ${day.isCritical ? 'text-red-600' : 'text-amber-600'}`}>Rp {formatNumber(day.saldoSetelahBelanja)}</span></div>
+                                        <div className="flex justify-between items-center"><span className="text-green-500 font-bold text-[10px]">➕ Pemasukan {day.isFuture ? '(Tgt)' : ''}</span><span className="font-bold text-green-500">+Rp {formatNumber(day.dailyIn)}</span></div>
+                                    </div>
+                                    <div className="flex justify-between items-center border-t border-slate-200 mt-3 pt-3">
+                                        <span className="text-indigo-600 font-black uppercase tracking-widest text-[10px]">Saldo Akhir</span>
+                                        <span className="font-black text-indigo-700 text-[13px] bg-indigo-100 px-2 py-1 rounded-lg">Rp {formatNumber(day.saldoAkhir)}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="bg-slate-900 p-5 text-white border-t-4 border-indigo-500">
+                            <h4 className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-3 flex items-center gap-2"><div className="w-4 h-4"><Icons.Bot/></div> Insight Fin</h4>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/10">
+                                    <span className="text-[10px] font-bold text-slate-300">Rata-rata Omzet Aktual</span>
+                                    <span className="font-black text-green-400">Rp {formatNumber(Math.round(data.avgInc))}/hr</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-indigo-500/20 p-2.5 rounded-xl border border-indigo-500/30">
+                                    <span className="text-[10px] font-bold text-slate-300">Est. Saldo Akhir Laporan</span>
+                                    <span className="font-black text-indigo-300 text-[13px]">Rp {formatNumber(Math.round(data.projectedFinal))}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- PLAN LOGIC ---
+            const handleDateChange = (e, setter) => {
+                const val = e.target.value;
+                if (!val) setter(getLocalDateStr()); else setter(val);
+            };
+
+            const handleAddItem = (e) => {
+                e.preventDefault();
+                if (!itemName || !qty) return;
+                const quantity = parseFloat(qty);
+                const total = totalNominal ? parseFloat(totalNominal.toString().replace(/\./g, '')) : 0;
+                
+                let newCart = [...cart];
+                if (editingId) {
+                    newCart = cart.map(i => i.id === editingId ? { ...i, name: itemName, qty: quantity, unit, total } : i);
+                    setEditingId(null);
+                } else {
+                    newCart = [...cart, { id: Date.now(), name: itemName, qty: quantity, unit, total }];
+                }
+                setCart(newCart);
+                if (!itemsDB.some(i => i.toLowerCase() === itemName.trim().toLowerCase())) setItemsDB([...itemsDB, itemName.trim()]);
+                
+                setItemName(''); setQty(''); setTotalNominal(''); setShowSuggestions(false);
+            };
+
+            const startEdit = (item) => {
+                setEditingId(item.id); setItemName(item.name); setQty(item.qty); setUnit(item.unit);
+                setTotalNominal(item.total || ''); setActiveTab('plan'); window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const resetForm = () => {
+                setItemName(''); setQty(''); setTotalNominal(''); setEditingId(null); setShowSuggestions(false);
+            };
+
+            const handleSaveNote = async () => {
+                if (cart.length === 0) return;
+                setIsSaving(true);
+                showStatus('Menyimpan Nota...', 'loading');
+                
+                const cartTotal = cart.reduce((acc, curr) => acc + curr.total, 0);
+                const isUpdating = currentNoteId !== null;
+
+                try {
+                    const noteData = {
+                        id: currentNoteId || (isLocalMode ? 'local-' + Date.now() : db.collection(paths.history).doc().id),
+                        date: transactionDate,
+                        items: cart,
+                        total: cartTotal,
+                        timestamp: Date.now()
+                    };
+
+                    if (isLocalMode) {
+                        let localHistory = JSON.parse(localStorage.getItem('fin-history') || '[]');
+                        if (currentNoteId) localHistory = localHistory.map(h => h.id === currentNoteId ? noteData : h);
+                        else localHistory.push(noteData);
+                        setHistory(localHistory.sort((a, b) => b.timestamp - a.timestamp));
+                    } else {
+                        if (currentNoteId) await db.collection(paths.history).doc(currentNoteId).set(noteData);
+                        else { const ref = db.collection(paths.history).doc(); noteData.id = ref.id; await ref.set(noteData); }
+                    }
+
+                    // Notifikasi Pintar Belanja
+                    if (!isUpdating) {
+                        const yesterdayObj = new Date(new Date(transactionDate).getTime());
+                        yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+                        const yesterdayStr = getLocalDateStr(yesterdayObj);
+                        
+                        const totalBelanjaHariIni = history.filter(h => h.date === transactionDate).reduce((sum, h) => sum + h.total, 0) + cartTotal;
+                        const pendapatanKemarin = incomes.filter(i => i.date === yesterdayStr).reduce((sum, i) => sum + i.amount, 0);
+
+                        let finMsg = `Sip, belanja senilai **Rp ${formatNumber(cartTotal)}** sudah Fin catat ya Bos. Kas otomatis terpotong.\n\n`;
+                        
+                        if (totalBelanjaHariIni > settings.maxBelanja) {
+                            const overAmount = totalBelanjaHariIni - settings.maxBelanja;
+                            finMsg += `⚠️ **PERINGATAN OVERBUDGET!**\nTotal belanja hari ini mencapai Rp ${formatNumber(totalBelanjaHariIni)}, lebih besar Rp ${formatNumber(overAmount)} dari jatah harian.\n`;
+                            
+                            if (pendapatanKemarin > settings.targetOmzet) {
+                                finMsg += `Untungnya omzet kemarin melampaui target (Rp ${formatNumber(pendapatanKemarin)}), jadi masih ada nafas. Tapi besok harus irit ya!`;
+                            } else {
+                                finMsg += `Apalagi omzet kemarin tidak capai target. **Wajib naikkan omzet hari ini di atas target** untuk menutupi selisihnya, kalau tidak kas akan kritis!`;
+                            }
+                        } else {
+                            finMsg += `Bagus! Total belanja hari ini masih aman di Rp ${formatNumber(totalBelanjaHariIni)} (Batas: Rp ${formatNumber(settings.maxBelanja)}). Lanjutkan disiplin ini.`;
+                        }
+
+                        setTimeout(() => {
+                            setChats(prev => [...prev, { id: Date.now()+1, sender: 'fin', text: finMsg, type: 'report' }]);
+                            setActiveTab('assistant');
+                        }, 500);
+                    }
+
+                    setCart([]); setCurrentNoteId(null);
+                    setIsSaving(false); showStatus(currentNoteId ? 'Arsip Diperbarui!' : 'Belanja Tersimpan!');
+                } catch (e) {
+                    console.error(e); setIsSaving(false); showStatus('Gagal Simpan', 'error');
+                }
+            };
+
+            const triggerClearCart = () => {
+                setConfirmModal({ show: true, title: 'Reset Rencana?', message: 'Hapus semua daftar belanja dari rencana ini?', onConfirm: () => {
+                    setCart([]); setCurrentNoteId(null); setConfirmModal({...confirmModal, show:false}); showStatus('Direset!');
+                }});
+            };
+
+            const copyToClipboard = (text) => {
+                const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el);
+                el.select(); document.execCommand('copy'); document.body.removeChild(el); showStatus('Prompt Disalin!');
+            };
+
+            const generatePrompt = () => {
+                const todayFormatted = new Date(transactionDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+                const total = cart.reduce((acc, curr) => acc + curr.total, 0);
+                let text = `Fin, catat pengeluaran bahan baku tanggal ${todayFormatted}.\n(Mohon jangan hilangkan nominal di dalam kurung dideskripsi), deskripsinya berikut:\n\n`;
+                const itemsList = cart.map(item => `${item.name} ${item.qty} ${item.unit} (${Math.round(item.total)})`).join(', ');
+                text += itemsList + `\n\nTotal: ${total}`;
+                copyToClipboard(text);
+            };
+
+            // --- INCOME LOGIC ---
+            const handleSaveIncome = (e) => {
+                e.preventDefault();
+                if (!incomeSource || !incomeAmount) { showStatus('Data Belum Lengkap', 'error'); return; }
+                const amount = parseFloat(incomeAmount.toString().replace(/\./g, ''));
+                const newIncome = { id: 'inc-' + Date.now(), date: incomeDate, source: incomeSource, amount: amount, timestamp: Date.now() };
+                
+                setIncomes(prev => [newIncome, ...prev].sort((a,b) => b.timestamp - a.timestamp));
+                setIncomeSource(''); setIncomeAmount(''); showStatus('Pemasukan Ditambahkan!');
+
+                // Smart Notification Income
+                let finMsg = `Wah mantap Bos! Pemasukan dari **${incomeSource}** senilai **Rp ${formatNumber(amount)}** sudah masuk ke kas kita.\n\n`;
+                if (amount >= settings.targetOmzet) {
+                    const surplus = amount - settings.targetOmzet;
+                    finMsg += `🎉 **TARGET TERCAPAI!** Omzet berhasil tembus target harian. Ada kelebihan Rp ${formatNumber(surplus)}.\n\n*Saran Fin: Sisihkan kelebihan ini untuk ditabung bayar sewa/gaji, atau masukkan ke laci dana darurat warung!*`;
+                } else {
+                    const shortage = settings.targetOmzet - amount;
+                    finMsg += `Tetap Semangat! Pemasukan ini masih kurang Rp ${formatNumber(shortage)} dari target omzet kita. Besok kita genjot lagi promosinya biar bisa bayar tagihan dengan tenang!`;
+                }
+
+                setTimeout(() => {
+                    setChats(prev => [...prev, { id: Date.now()+1, sender: 'fin', text: finMsg, type: 'report' }]);
+                    setActiveTab('assistant');
+                }, 500);
+            };
+
+            const deleteIncome = (id) => {
+                setConfirmModal({
+                    show: true,
+                    title: 'Hapus Pemasukan?',
+                    message: 'Hapus histori pemasukan ini? Saldo akan terkoreksi otomatis.',
+                    onConfirm: () => {
+                        setIncomes(prev => prev.filter(i => i.id !== id));
+                        setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                        showStatus('Pemasukan Terhapus!');
+                    }
+                });
+            };
+
+            const generateIncomePrompt = (e) => {
+                e.preventDefault();
+                if (!incomeSource || !incomeAmount) { showStatus('Data Belum Lengkap', 'error'); return; }
+                const dateFormatted = new Date(incomeDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+                const amountRaw = incomeAmount.toString().replace(/\./g, '');
+                copyToClipboard(`Fin, ada pemasukan tolong catat ya Payout ${incomeSource} tgl ${dateFormatted} sebesar Rp${amountRaw}`);
+            };
+
+            // --- AGENDA LOGIC & CALENDAR ---
+            const handleAddAgenda = (e) => {
+                e.preventDefault();
+                if(!agendaTitle || !agendaAmount) return;
+                const newAg = { id: 'agd-'+Date.now(), date: agendaDate, title: agendaTitle, amount: parseFloat(agendaAmount), type: agendaType, isPaid: false };
+                setAgendas(prev => [...prev, newAg].sort((a,b) => new Date(a.date) - new Date(b.date)));
+                setAgendaTitle(''); setAgendaAmount(''); showStatus('Agenda Tersimpan!');
+            };
+
+            const deleteAgenda = (id) => {
+                setConfirmModal({
+                    show: true,
+                    title: 'Hapus Agenda?',
+                    message: 'Hapus agenda ini?',
+                    onConfirm: () => {
+                        setAgendas(prev => prev.filter(a => a.id !== id));
+                        setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                        showStatus('Agenda Terhapus!');
+                    }
+                });
+            };
+
+            const toggleAgendaPaid = (id) => {
+                setAgendas(prev => prev.map(a => a.id === id ? { ...a, isPaid: !a.isPaid } : a));
+            };
+
+            const renderCalendar = () => {
+                const todayObj = new Date();
+                const year = todayObj.getFullYear();
+                const month = todayObj.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const firstDay = new Date(year, month, 1).getDay(); // 0 is Sunday
+                
+                let blanks = [];
+                for (let i = 0; i < firstDay; i++) blanks.push(<div key={`blank-${i}`} className="w-8 h-8"></div>);
+                
+                let daysElements = [];
+                for (let d = 1; d <= daysInMonth; d++) {
+                    let dObj = new Date(year, month, d);
+                    let dStr = getLocalDateStr(dObj);
+                    
+                    let hasAgenda = agendas.some(a => a.date === dStr && !a.isPaid);
+                    let isSelected = agendaDate === dStr;
+                    let isToday = dStr === getLocalDateStr(todayObj);
+                    
+                    daysElements.push(
+                        <button key={dStr} onClick={() => setAgendaDate(dStr)} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold relative transition-colors ${isSelected ? 'bg-indigo-600 text-white shadow-md' : (isToday ? 'bg-indigo-100 text-indigo-800' : 'text-slate-600 hover:bg-slate-200')}`}>
+                            {d}
+                            {hasAgenda && <span className={`absolute bottom-1 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'}`}></span>}
+                        </button>
+                    );
+                }
+                
+                return (
+                    <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-4">
+                        <div className="flex justify-between items-center mb-3 px-2">
+                            <span className="font-black text-slate-800 uppercase tracking-widest text-[11px]">{todayObj.toLocaleDateString('id-ID', {month:'long', year:'numeric'})}</span>
+                        </div>
+                        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                            {['M','S','S','R','K','J','S'].map((day,i) => <div key={i} className="text-[10px] font-bold text-slate-400">{day}</div>)}
+                        </div>
+                        <div className="grid grid-cols-7 gap-1 justify-items-center">
+                            {blanks}{daysElements}
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- ARCHIVE LOGIC ---
+            const triggerDeleteHistory = (noteId) => {
+                setConfirmModal({ show: true, title: 'Hapus Arsip?', message: 'Data ini akan dihapus permanen. Lanjutkan?', onConfirm: async () => {
+                    setConfirmModal({ ...confirmModal, show: false }); showStatus('Menghapus...', 'loading');
+                    try {
+                        if (isLocalMode) {
+                            setHistory(prev => prev.filter(h => h.id !== noteId));
+                        } else {
+                            if (user && paths) await db.collection(paths.history).doc(noteId).delete();
+                        }
+                        showStatus('Arsip Dihapus!');
+                    } catch (e) { showStatus('Gagal Menghapus', 'error'); }
+                }});
+            };
+
+            const triggerResetData = () => {
+                setShowSettings(false); // Tutup menu setting agar popup konfirmasi tidak tertumpuk
+                setConfirmModal({
+                    show: true, 
+                    title: 'RESET DATA BULANAN?', 
+                    message: 'PERINGATAN: Semua Riwayat Belanja, Pemasukan, Agenda, dan Chat akan DIHAPUS PERMANEN. Hanya Pengaturan dan Master Bahan yang tersisa. Lanjutkan?', 
+                    onConfirm: async () => {
+                        setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                        showStatus('Mereset Data...', 'loading');
+                        try {
+                            setHistory([]); setIncomes([]); setAgendas([]); setCart([]); 
+                            setChats([{ id: Date.now(), sender: 'fin', text: 'Semua data bulan lalu sudah Fin bersihkan Bos. Kas sudah kembali ke Saldo Dasar. Semangat bulan baru! 🚀', type: 'text' }]);
+                            
+                            if (!isLocalMode && user && paths) {
+                                const snap = await db.collection(paths.history).get();
+                                const batch = db.batch();
+                                snap.docs.forEach(doc => batch.delete(doc.ref));
+                                await batch.commit();
+                            }
+                            showStatus('Semua Data Berhasil Direset!');
+                            setActiveTab('assistant');
+                        } catch (e) { showStatus('Gagal Mereset Data', 'error'); }
+                    }
+                });
+            };
+
+            const triggerResetChat = () => {
+                setShowSettings(false);
+                setConfirmModal({
+                    show: true,
+                    title: 'RESET CHAT?',
+                    message: 'Bersihkan layar chat AI?',
+                    onConfirm: () => {
+                        setChats([{ id: Date.now(), sender: 'fin', text: 'Layar chat sudah Fin bersihkan. Ada yang bisa dibantu lagi Bos?', type: 'text' }]);
+                        setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                        showStatus('Chat Dibersihkan!');
+                    }
+                });
+            };
+
+            // --- RENDERERS ---
+            const renderAssistant = () => (
+                <div className="flex flex-col h-full bg-slate-100 rounded-[2.5rem] overflow-hidden shadow-inner border border-slate-200/60 pb-28">
+                    <div className="bg-indigo-600 text-white p-5 flex justify-between items-center z-10 shadow-md">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md"><Icons.Bot /></div>
+                            <div>
+                                <h2 className="font-black tracking-wide leading-tight">Fin Assistant</h2>
+                                <p className="text-[10px] text-indigo-200 font-bold uppercase tracking-widest">Siap Membantu & Mikir</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[9px] text-indigo-200 font-bold uppercase tracking-widest mb-0.5">Saldo Kas</p>
+                            <p className="font-black tracking-tighter text-lg leading-none">Rp {formatNumber(currentBalance)}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 p-4 overflow-y-auto no-scrollbar flex flex-col gap-4">
+                        {chats.map(chat => (
+                            <div key={chat.id} className={`flex w-full chat-enter ${chat.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] ${chat.type === 'cashflow' || chat.type === 'kas_report' ? 'w-full' : 'p-4'} rounded-[1.5rem] shadow-sm text-[13px] leading-relaxed ${
+                                    chat.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : (chat.type === 'cashflow' || chat.type === 'kas_report' ? 'bg-transparent shadow-none' : 'glass-bubble text-slate-700 rounded-tl-sm border border-white')
+                                }`}>
+                                    {chat.type === 'cashflow' ? (
+                                        <div className="flex flex-col gap-2">
+                                            <div className="glass-bubble p-4 rounded-[1.5rem] rounded-tl-sm text-slate-700 w-fit">{chat.text}</div>
+                                            {renderCashFlowWidget(generateCashFlowData(chat.mode || 'harian'))}
+                                        </div>
+                                    ) : chat.type === 'kas_report' ? (
+                                        <div className="flex flex-col gap-2">
+                                            <div className="glass-bubble p-4 rounded-[1.5rem] rounded-tl-sm text-slate-700 w-fit">{chat.text}</div>
+                                            <div className="glass-bubble p-4 rounded-[1.5rem] rounded-tl-sm text-slate-700 w-full whitespace-pre-line text-[13px] leading-relaxed border border-white">
+                                                {generateKasReport().split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-indigo-700 font-black">{part}</strong> : part)}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="whitespace-pre-line">
+                                            {chat.text.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className={chat.sender === 'user' ? 'text-white font-black' : 'text-indigo-700 font-black'}>{part}</strong> : part)}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {isTyping && (
+                            <div className="flex w-full chat-enter justify-start">
+                                <div className="glass-bubble border border-white p-4 rounded-[1.5rem] rounded-tl-sm shadow-sm flex items-center gap-2 w-fit">
+                                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    <div className="p-4 bg-white border-t border-slate-100 relative z-20">
+                        <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                            <button onClick={() => handleChatSubmit(null, "Laporan Harian")} className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-indigo-100 hover:bg-indigo-100 transition-colors shadow-sm">📊 7 Hari</button>
+                            <button onClick={() => handleChatSubmit(null, "Laporan Minggu Ini")} className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors shadow-sm">📅 Minggu Ini</button>
+                            <button onClick={() => handleChatSubmit(null, "Laporan Awal Bulan")} className="bg-purple-50 text-purple-600 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-purple-100 hover:bg-purple-100 transition-colors shadow-sm">📆 Bln Ini</button>
+                            <button onClick={() => handleChatSubmit(null, "Cek Kas")} className="bg-green-50 text-green-600 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-green-100 hover:bg-green-100 transition-colors shadow-sm">💰 Cek Kas</button>
+                        </div>
+                        <form onSubmit={(e) => handleChatSubmit(e)} className="flex gap-2 relative">
+                            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Tanya bisnis ke AI..." className="flex-1 bg-slate-100 p-4 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300" />
+                            <button type="submit" disabled={isTyping} className={`w-14 text-white rounded-2xl flex items-center justify-center transition-colors active:scale-95 shadow-lg ${isTyping ? 'bg-indigo-400 shadow-none cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30'}`}><div className="w-6 h-6"><Icons.Send /></div></button>
+                        </form>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 relative shadow-2xl font-sans">
+                    {/* Status Feedback */}
+                    {status.show && (
+                        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[500] w-max">
+                            <div className="px-6 py-3 rounded-full shadow-2xl bg-slate-900 text-white animate-status flex items-center gap-3 text-sm font-bold border border-slate-700">
+                                <div className="w-5 h-5 text-green-400"><Icons.Check /></div> {status.message}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal Peringatan Tagihan (Pop-up Awal) */}
+                    {reminderModal.show && (
+                        <div className="fixed inset-0 z-[400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 modal-enter shadow-2xl border-4 border-red-100 relative overflow-hidden">
+                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-100 rounded-full blur-3xl opacity-50"></div>
+                                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4 mx-auto animate-bounce relative z-10 shadow-inner">
+                                    <Icons.Warn />
+                                </div>
+                                <h3 className="text-xl font-black text-center text-gray-800 mb-2 relative z-10">ALARM TAGIHAN!</h3>
+                                <p className="text-[13px] text-center text-gray-500 mb-6 font-medium relative z-10">Bos, ada tagihan yang mendekati jatuh tempo nih. Jangan lupa disiapkan dananya ya!</p>
+                                
+                                <div className="space-y-2 mb-6 max-h-48 overflow-y-auto no-scrollbar relative z-10">
+                                    {reminderModal.items.map(item => (
+                                        <div key={item.id} className="bg-red-50 border border-red-100 p-3.5 rounded-[1.2rem] flex justify-between items-center shadow-sm">
+                                            <div>
+                                                <p className="font-black text-red-700 text-xs uppercase">{item.title}</p>
+                                                <p className="text-[10px] text-red-400 font-bold">{new Date(item.date).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}</p>
+                                            </div>
+                                            <p className="font-black text-red-600 bg-red-100 px-2 py-1 rounded-lg text-sm">Rp {formatNumber(item.amount)}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="space-y-3 relative z-10">
+                                    <button onClick={() => { setReminderModal({ show: false, items: [] }); setActiveTab('agenda'); }} className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-black rounded-2xl shadow-lg shadow-red-500/30 transition-all uppercase tracking-widest text-[11px]">
+                                        CEK AGENDA SEKARANG
+                                    </button>
+                                    <button onClick={() => setReminderModal({ show: false, items: [] })} className="w-full py-3 bg-transparent text-gray-400 font-bold rounded-2xl hover:bg-gray-50 text-[11px] uppercase tracking-widest transition-colors">
+                                        TUTUP DULU
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modals Settings */}
+                    {showSettings && (
+                        <div className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="bg-white w-full rounded-[2.5rem] p-6 modal-enter shadow-2xl">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="font-black text-lg text-slate-800">Pengaturan Target</h3>
+                                    <button onClick={() => setShowSettings(false)} className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><Icons.X /></button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Modal Awal Sistem (Saldo Dasar)</label>
+                                        <input type="number" value={settings.saldoAwal} onChange={e => setSettings({...settings, saldoAwal: parseInt(e.target.value)||0})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Target Omzet Harian Fin</label>
+                                        <input type="number" value={settings.targetOmzet} onChange={e => setSettings({...settings, targetOmzet: parseInt(e.target.value)||0})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold text-green-600" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Batas Belanja Harian Fin</label>
+                                        <input type="number" value={settings.maxBelanja} onChange={e => setSettings({...settings, maxBelanja: parseInt(e.target.value)||0})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold text-red-500" />
+                                    </div>
+                                    <button onClick={() => setShowSettings(false)} className="w-full py-4 mt-2 bg-indigo-600 text-white font-black rounded-2xl shadow-lg shadow-indigo-500/30">SIMPAN PENGATURAN</button>
+                                    
+                                    <div className="pt-5 mt-3 border-t border-slate-100 space-y-3">
+                                        <h4 className="text-[10px] text-red-400 font-black uppercase tracking-widest text-center">Zona Berbahaya (Reset)</h4>
+                                        <div className="flex gap-2">
+                                            <button onClick={triggerResetChat} className="flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl text-[10px] uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-colors">Reset Chat</button>
+                                            <button onClick={triggerResetData} className="flex-1 py-3 bg-red-50 text-red-600 font-bold rounded-xl text-[10px] uppercase tracking-widest border border-red-100 hover:bg-red-100 transition-colors">Hapus Semua Data</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {confirmModal.show && (
+                        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                            <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl modal-enter border border-white/20">
+                                <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4 mx-auto"><Icons.Warn /></div>
+                                <h3 className="text-lg font-black text-center text-slate-800 mb-2">{confirmModal.title}</h3>
+                                <p className="text-sm text-center text-slate-500 mb-6 font-medium">{confirmModal.message}</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setConfirmModal({ show: false, title: '', message: '', onConfirm: null })} className="flex-1 py-3 bg-slate-100 font-bold rounded-xl text-slate-500">Batal</button>
+                                    <button onClick={confirmModal.onConfirm} className="flex-1 py-3 bg-red-500 font-bold rounded-xl text-white shadow-lg shadow-red-500/30">Ya, Lanjutkan</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Header Top */}
+                    <header className="p-6 pt-10 flex justify-between items-center bg-transparent z-10 shrink-0">
+                        <div>
+                            <h1 className="text-3xl font-black tracking-tighter text-slate-900">Q-Nota<span className="text-indigo-600">.</span></h1>
+                            <p className="text-[9px] uppercase font-bold text-slate-400 mt-1 tracking-[0.2em]">{isLocalMode ? 'Mode Offline' : 'Cloud Sync'}</p>
+                        </div>
+                        <button onClick={() => setShowSettings(true)} className="w-12 h-12 bg-white rounded-full shadow-sm border border-slate-100 flex items-center justify-center text-slate-500 hover:text-indigo-600 transition-colors"><div className="w-6 h-6"><Icons.Gear /></div></button>
+                    </header>
+
+                    <main className="flex-1 px-5 pb-5 overflow-hidden flex flex-col">
+                        {activeTab === 'assistant' && renderAssistant()}
+                        
+                        {activeTab === 'plan' && (
+                            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 space-y-4">
+                                <div className="p-6 rounded-[2.5rem] bg-white shadow-sm border border-slate-100">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h2 className="font-extrabold text-slate-800 uppercase text-[10px] tracking-widest">{editingId ? 'Update Item' : 'Input Belanja'}</h2>
+                                        {editingId && <button onClick={resetForm} className="text-amber-500 bg-amber-50 w-6 h-6 rounded-full p-1"><Icons.X /></button>}
+                                    </div>
+                                    <form onSubmit={handleAddItem} className="space-y-3">
+                                        {!editingId && <input type="date" value={transactionDate} onChange={e => handleDateChange(e, setTransactionDate)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none" />}
+                                        <div className="relative">
+                                            <input type="text" value={itemName} onChange={e => { setItemName(e.target.value); setShowSuggestions(true); }} placeholder="Nama Barang..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-300" />
+                                            {showSuggestions && itemName && itemsDB.filter(i=>i.toLowerCase().includes(itemName.toLowerCase())).length > 0 && (
+                                                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 shadow-xl rounded-xl max-h-40 overflow-auto">
+                                                    {itemsDB.filter(i=>i.toLowerCase().includes(itemName.toLowerCase())).slice(0, 10).map((item, idx) => (
+                                                        <div key={idx} onClick={() => { setItemName(item); setShowSuggestions(false); }} className="p-4 hover:bg-slate-50 font-bold text-xs cursor-pointer">{item}</div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="number" step="any" value={qty} onChange={e => setQty(e.target.value)} placeholder="Qty (Misal: 0.5)" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-center outline-none" />
+                                            <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-indigo-700 text-center outline-none appearance-none">
+                                                {commonUnits.map(u => <option key={u} value={u}>{u}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <input type="number" value={totalNominal} onChange={e => setTotalNominal(e.target.value)} placeholder="Total Harga Keseluruhan (Rp)" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-right text-indigo-800 outline-none" />
+                                        </div>
+                                        <button type="submit" className={`w-full py-4 text-white font-black rounded-xl shadow-lg mt-2 ${editingId ? 'bg-amber-500 shadow-amber-500/30' : 'bg-indigo-600 shadow-indigo-500/30'}`}>{editingId ? 'UPDATE ITEM' : 'TAMBAH KE LIST'}</button>
+                                    </form>
+                                </div>
+                                
+                                {cart.length > 0 && (
+                                    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                                        <div className="p-5 bg-slate-50 border-b flex justify-between items-center">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{currentNoteId ? 'Mengedit Arsip' : 'Daftar Belanja Saat Ini'}</span>
+                                            <button onClick={triggerClearCart} className="text-red-500 text-[10px] font-black uppercase px-3 py-1 bg-red-50 rounded-full flex items-center gap-1"><div className="w-3 h-3"><Icons.Trash/></div> HAPUS</button>
+                                        </div>
+                                        <div className="divide-y divide-slate-50 max-h-[35vh] overflow-y-auto no-scrollbar">
+                                            {cart.map(item => (
+                                                <div key={item.id} className="p-5 flex justify-between items-center">
+                                                    <div>
+                                                        <p className="font-black text-[13px] text-slate-800 uppercase">{item.name}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold italic">{item.qty} {item.unit} — Rp {formatNumber(item.total)}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => startEdit(item)} className="text-indigo-500 p-2 bg-indigo-50 rounded-lg"><div className="w-4 h-4"><Icons.Edit/></div></button>
+                                                        <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} className="text-red-400 p-2 hover:bg-red-50 rounded-lg"><div className="w-4 h-4"><Icons.Trash/></div></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="p-6 bg-slate-900 text-white rounded-b-[2.5rem]">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-[10px] font-bold opacity-50 uppercase">Total Pengeluaran</span>
+                                                <span className="text-xl font-black text-indigo-400">Rp {formatNumber(cart.reduce((a, b) => a + b.total, 0))}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button onClick={handleSaveNote} disabled={isSaving} className="w-full py-4 bg-white/10 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-colors">SIMPAN & POTONG KAS</button>
+                                                <button onClick={generatePrompt} className="w-full py-4 bg-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-500/30">BUAT PROMPT AI</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'income' && (
+                            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 space-y-4">
+                                <div className="p-6 rounded-[2.5rem] bg-white shadow-sm border border-slate-100">
+                                    <h2 className="font-extrabold text-slate-800 uppercase text-[10px] tracking-widest mb-4 text-green-600 flex items-center gap-2"><div className="w-4 h-4"><Icons.Wallet /></div> Input Pemasukan / Omzet</h2>
+                                    <form onSubmit={handleSaveIncome} className="space-y-4">
+                                        <input type="date" value={incomeDate} onChange={e => handleDateChange(e, setIncomeDate)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" />
+                                        <div className="relative">
+                                            <input type="text" value={incomeSource} onChange={e => { setIncomeSource(e.target.value); setShowIncomeSuggestions(true); }} onFocus={()=>setShowIncomeSuggestions(true)} onBlur={()=>setTimeout(()=>setShowIncomeSuggestions(false),200)} placeholder="Sumber (Grab, Kasir, dll)" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold uppercase outline-none" />
+                                            {showIncomeSuggestions && (
+                                                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 shadow-xl rounded-xl overflow-hidden">
+                                                    {incomeTypes.map(t => <div key={t} onMouseDown={()=>setIncomeSource(t)} className="p-4 hover:bg-slate-50 font-bold text-xs cursor-pointer">{t}</div>)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <input type="number" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} placeholder="Nominal Bersih Rp" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-right text-green-700 outline-none" />
+                                        <div className="grid grid-cols-2 gap-3 mt-2">
+                                            <button type="button" onClick={generateIncomePrompt} className="py-4 bg-indigo-50 text-indigo-600 font-black rounded-2xl text-[10px] uppercase">PROMPT FIN</button>
+                                            <button type="submit" className="py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-500/30 text-[10px] uppercase">TAMBAH KE KAS</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div className="px-2">
+                                    <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-widest mb-3">Histori Pemasukan</h3>
+                                    {incomes.length === 0 ? <p className="text-xs text-center text-slate-400 py-4 font-bold">Belum ada pemasukan.</p> : incomes.map(inc => (
+                                        <div key={inc.id} className="bg-white p-4 rounded-2xl mb-2 flex justify-between items-center shadow-sm border border-slate-100">
+                                            <div>
+                                                <p className="font-black text-slate-700 text-[11px] uppercase">{inc.source}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold">{new Date(inc.date).toLocaleDateString('id-ID', {day:'numeric', month:'short'})}</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <p className="font-black text-green-600 text-sm">+ Rp {formatNumber(inc.amount)}</p>
+                                                <button onClick={() => deleteIncome(inc.id)} className="w-7 h-7 bg-red-50 text-red-400 rounded-full flex items-center justify-center hover:bg-red-100"><Icons.Trash /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'agenda' && (
+                            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 space-y-4">
+                                {renderCalendar()}
+                                
+                                <div className="p-6 rounded-[2.5rem] bg-slate-900 text-white shadow-xl">
+                                    <h2 className="font-extrabold uppercase text-[10px] tracking-widest mb-4 flex items-center gap-2"><div className="w-4 h-4"><Icons.Calendar /></div> Tambah Agenda / Tagihan</h2>
+                                    <form onSubmit={handleAddAgenda} className="space-y-4">
+                                        <input type="date" value={agendaDate} onChange={e => handleDateChange(e, setAgendaDate)} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-white outline-none" />
+                                        <input type="text" value={agendaTitle} onChange={e => setAgendaTitle(e.target.value)} placeholder="Judul (Gaji, Listrik, Sewa)" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl font-bold outline-none" />
+                                        <div className="flex gap-2">
+                                            <select value={agendaType} onChange={e => setAgendaType(e.target.value)} className="w-1/3 p-4 bg-slate-800 border border-slate-700 rounded-2xl font-bold outline-none appearance-none text-center">
+                                                <option value="keluar">Keluar</option>
+                                                <option value="masuk">Masuk</option>
+                                            </select>
+                                            <input type="number" value={agendaAmount} onChange={e => setAgendaAmount(e.target.value)} placeholder="Nominal Rp" className="flex-1 p-4 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-right outline-none" />
+                                        </div>
+                                        <button type="submit" className="w-full py-4 bg-indigo-500 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest">SIMPAN AGENDA</button>
+                                    </form>
+                                </div>
+
+                                <div className="px-2">
+                                    <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-widest mb-3">Agenda Tanggal {new Date(agendaDate).toLocaleDateString('id-ID', {day:'numeric', month:'short'})}</h3>
+                                    {agendas.filter(a => a.date === agendaDate).length === 0 ? <p className="text-xs text-center text-slate-400 py-4 font-bold">Tidak ada agenda pada tanggal ini.</p> : 
+                                    agendas.filter(a => a.date === agendaDate).map(ag => (
+                                        <div key={ag.id} className={`p-4 rounded-2xl mb-2 flex items-center gap-3 shadow-sm border transition-all ${ag.isPaid ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200'}`}>
+                                            <button onClick={() => toggleAgendaPaid(ag.id)} className={`w-8 h-8 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors ${ag.isPaid ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 text-transparent'}`}>
+                                                <div className="w-4 h-4"><Icons.Check /></div>
+                                            </button>
+                                            <div className="flex-1">
+                                                <p className={`font-black text-xs uppercase ${ag.isPaid ? 'line-through text-slate-400' : 'text-slate-800'}`}>{ag.title}</p>
+                                                <p className="text-[10px] font-bold text-slate-400">{new Date(ag.date).toLocaleDateString('id-ID', {day:'numeric', month:'short'})}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className={`font-black text-sm ${ag.type === 'keluar' ? 'text-red-500' : 'text-green-500'}`}>{ag.type==='keluar'?'-':'+'} {formatNumber(ag.amount)}</p>
+                                                <button onClick={() => deleteAgenda(ag.id)} className="text-[9px] text-slate-300 font-bold uppercase mt-1 hover:text-red-500">Hapus</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'arsip' && (
+                            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 space-y-4">
+                                <div className="px-2 flex justify-between items-center mb-2">
+                                    <h2 className="font-extrabold text-slate-800 uppercase tracking-widest text-[11px] italic text-slate-400">Riwayat Pengeluaran</h2>
+                                </div>
+                                {history.length === 0 ? (
+                                    <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200 mx-2">
+                                        <div className="w-10 h-10 mx-auto text-slate-200 mb-3"><Icons.Archive /></div>
+                                        <p className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Belum ada arsip belanja</p>
+                                    </div>
+                                ) : (
+                                    history.map(note => (
+                                        <div key={note.id} className="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm relative overflow-hidden mb-4">
+                                            <div className="flex justify-between items-center mb-5">
+                                                <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full uppercase tracking-widest font-mono italic">
+                                                    {new Date(note.date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}
+                                                </span>
+                                                <span className="font-black text-slate-900">Rp {formatNumber(note.total)}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setCart(note.items); setTransactionDate(note.date); setCurrentNoteId(note.id); setActiveTab('plan'); showStatus('Mode Edit Arsip'); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-md">LIHAT DETAIL & EDIT</button>
+                                                <button onClick={() => triggerDeleteHistory(note.id)} className="w-12 bg-red-50 text-red-500 rounded-xl flex justify-center items-center hover:bg-red-100 transition-colors"><div className="w-5 h-5"><Icons.Trash /></div></button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                    </main>
+
+                    {/* Tombol Tampilkan Menu (Muncul saat Nav disembunyikan) */}
+                    <div className={`fixed left-1/2 -translate-x-1/2 z-[160] transition-all duration-500 ease-in-out ${showNav ? 'bottom-28 opacity-0 pointer-events-none translate-y-10' : 'bottom-6 opacity-100 translate-y-0'}`}>
+                        <button onClick={() => setShowNav(true)} className="bg-slate-900/90 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-2xl border border-slate-700/50 flex items-center gap-2 hover:bg-slate-800 transition-colors hover:scale-105 active:scale-95">
+                            <div className="w-5 h-5"><Icons.ChevronUp /></div>
+                            <span className="text-[11px] font-black uppercase tracking-widest">Menu Utama</span>
+                        </button>
+                    </div>
+
+                    {/* Navbar Bawah */}
+                    <nav className={`fixed left-1/2 -translate-x-1/2 w-[95%] max-w-[420px] glass-nav rounded-[2.5rem] flex justify-between px-3 py-2 z-[150] shadow-2xl border border-slate-700/50 transition-all duration-500 ease-in-out ${showNav ? 'bottom-6 translate-y-0 opacity-100' : '-bottom-32 translate-y-full opacity-0 pointer-events-none'}`}>
+                        {/* Tab Toggle Sembunyikan Menu */}
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                            <button onClick={() => setShowNav(false)} className="w-16 h-5 bg-slate-900/95 backdrop-blur-md rounded-t-full flex items-center justify-center border-t border-x border-slate-700/50 text-slate-400 hover:text-white transition-colors cursor-pointer group shadow-lg">
+                                <div className="w-4 h-4 group-hover:translate-y-0.5 transition-transform"><Icons.ChevronDown /></div>
+                            </button>
+                        </div>
+
+                        <button onClick={() => setActiveTab('assistant')} className={`flex-1 py-3 rounded-[2rem] flex flex-col items-center transition-all ${activeTab === 'assistant' ? 'bg-indigo-600 text-white scale-105 shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:text-white'}`}>
+                            <div className="w-5 h-5"><Icons.Bot /></div><span className="text-[7px] font-black uppercase mt-1 tracking-widest">Fin</span>
+                        </button>
+                        <button onClick={() => setActiveTab('plan')} className={`flex-1 py-3 rounded-[2rem] flex flex-col items-center transition-all ${activeTab === 'plan' ? 'bg-indigo-600 text-white scale-105 shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:text-white'}`}>
+                            <div className="w-5 h-5"><Icons.ShopBag /></div><span className="text-[7px] font-black uppercase mt-1 tracking-widest">Belanja</span>
+                        </button>
+                        <button onClick={() => setActiveTab('income')} className={`flex-1 py-3 rounded-[2rem] flex flex-col items-center transition-all ${activeTab === 'income' ? 'bg-indigo-600 text-white scale-105 shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:text-white'}`}>
+                            <div className="w-5 h-5"><Icons.Wallet /></div><span className="text-[7px] font-black uppercase mt-1 tracking-widest">Income</span>
+                        </button>
+                        <button onClick={() => setActiveTab('agenda')} className={`flex-1 py-3 rounded-[2rem] flex flex-col items-center transition-all ${activeTab === 'agenda' ? 'bg-indigo-600 text-white scale-105 shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:text-white'}`}>
+                            <div className="w-5 h-5"><Icons.Calendar /></div><span className="text-[7px] font-black uppercase mt-1 tracking-widest">Agenda</span>
+                        </button>
+                        <button onClick={() => setActiveTab('arsip')} className={`flex-1 py-3 rounded-[2rem] flex flex-col items-center transition-all ${activeTab === 'arsip' ? 'bg-indigo-600 text-white scale-105 shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:text-white'}`}>
+                            <div className="w-5 h-5"><Icons.Archive /></div><span className="text-[7px] font-black uppercase mt-1 tracking-widest">Arsip</span>
+                        </button>
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
